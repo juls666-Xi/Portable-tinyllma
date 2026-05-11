@@ -45,7 +45,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # otherwise falls back to a chat_data/ folder next to this script.
 _home_base = os.path.join(os.path.expanduser("~"), "tinyllama", "chat_data")
 CHATS_DIR = _home_base if os.path.isdir(os.path.join(os.path.expanduser("~"), "tinyllama")) \
-            else os.path.join(SCRIPT_DIR, "chat_data")
+    else os.path.join(SCRIPT_DIR, "chat_data")
 CHATS_FILE = os.path.join(CHATS_DIR, "chats.json")
 SETTINGS_FILE = os.path.join(CHATS_DIR, "settings.json")
 
@@ -182,12 +182,12 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
         ts = time.strftime("%H:%M:%S")
         # Colour-code by status: errors red, warnings yellow, ok green
         if "404" in msg or "500" in msg or "502" in msg:
-            prefix = "  \033[91m[ERR]\033[0m"
+            prefix = " \033[91m[ERR]\033[0m"
         elif "200" in msg or "204" in msg:
-            prefix = "  \033[92m[ OK]\033[0m"
+            prefix = " \033[92m[ OK]\033[0m"
         else:
-            prefix = "  \033[93m[---]\033[0m"
-        print(f"{prefix} {ts}  {msg}")
+            prefix = " \033[93m[---]\033[0m"
+        print(f"{prefix} {ts} {msg}")
 
     # ── CORS headers ───────────────────────────────────────────
     def _cors_headers(self):
@@ -402,7 +402,8 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self._cors_headers()
                 self.end_headers()
-                self.wfile.write(json.dumps({"models":[{"name": "local-llama-model"}]}).encode())
+                # Updated model name for Q2_K
+                self.wfile.write(json.dumps({"models":[{"name": "tinyllama-1.1b-chat-v1.0.Q2_K"}]}).encode())
                 return
 
             if LLAMA_CPP_MODE and ollama_path == "/api/chat":
@@ -446,7 +447,7 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
                 chunk = response.read(4096)
                 if not chunk:
                     break
-                
+
                 # If bridging llama.cpp SSE to Ollama JSONL
                 if LLAMA_CPP_MODE and is_stream:
                     text = chunk.decode(errors="ignore")
@@ -470,8 +471,8 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
                                 pass
                 else:
                     self.wfile.write(chunk)
-                    if is_stream:
-                        self.wfile.flush()
+                if is_stream:
+                    self.wfile.flush()
 
         except urllib.error.HTTPError as e:
             self.send_response(e.code)
@@ -534,17 +535,17 @@ def main():
 
     print()
     print("=" * 55)
-    print("  Portable AI — Chat Server")
+    print(" Portable AI — Chat Server")
     print("=" * 55)
     print()
-    print(f"  Local Access:    http://localhost:{CHAT_SERVER_PORT}")
-    print(f"  Network Access:  http://{local_ip}:{CHAT_SERVER_PORT}   <-- Use this on phone/other PC!")
-    print(f"  Ollama/Llama Proxy: {OLLAMA_HOST}")
+    print(f" Local Access: http://localhost:{CHAT_SERVER_PORT}")
+    print(f" Network Access: http://{local_ip}:{CHAT_SERVER_PORT} <-- Use this on phone/other PC!")
+    print(f" Ollama/Llama Proxy: {OLLAMA_HOST}")
     if LLAMA_CPP_MODE:
-        print("  Running in LLAMA_CPP_MODE (Translating API requests)")
+        print(" Running in LLAMA_CPP_MODE (Translating API requests)")
     print()
-    print("  All chats auto-save to the USB drive!")
-    print("  Press Ctrl+C to shut down.")
+    print(" All chats auto-save to the USB drive!")
+    print(" Press Ctrl+C to shut down.")
     print()
     print("-" * 55)
 

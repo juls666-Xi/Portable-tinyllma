@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ================================================================
-#  TinyLlama 1.1B — Termux Launcher
+# TinyLlama 1.1B Q2_K — Termux Launcher
 #  Usage: bash start.sh
 # ================================================================
 
@@ -22,7 +22,7 @@ fail() { echo -e "${R}  ✗ $1${N}"; exit 1; }
 
 echo ""
 echo -e "${C}================================================${N}"
-echo -e "${C}      TinyLlama 1.1B — Termux Launcher          ${N}"
+echo -e "${C} TinyLlama 1.1B Q2_K — Termux Launcher ${N}"
 echo -e "${C}================================================${N}"
 echo ""
 
@@ -47,10 +47,11 @@ fi
 
 echo -e "  Model  : ${W}$(basename "$TINYLLAMA_MODEL")${N}"
 echo -e "  Engine : ${W}llama.cpp (native ARM)${N}"
+echo -e "  Quant  : ${W}Q2_K (ultra-lightweight, ~400MB)${N}"
 echo ""
 
 # ---- RAM check ----
-TOTAL_KB=$(grep MemTotal    /proc/meminfo | awk '{print $2}')
+TOTAL_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
 AVAIL_KB=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
 TOTAL_GB=$(awk "BEGIN{printf \"%.1f\", $TOTAL_KB/1048576}")
 AVAIL_GB=$(awk "BEGIN{printf \"%.1f\", $AVAIL_KB/1048576}")
@@ -58,7 +59,7 @@ echo -e "  RAM    : ${W}${AVAIL_GB} GB free${N} / ${TOTAL_GB} GB total"
 
 AVAIL_INT=$(awk "BEGIN{printf \"%d\", $AVAIL_KB/1048576}")
 if [ "$AVAIL_INT" -lt 1 ]; then
-    warn "Very low RAM! Close all other apps, then retry."
+    warn "Very low RAM! Q2_K needs ~500 MB free. Close other apps, then retry."
     read -r -p "  Continue anyway? (y/N): " ANS
     [[ "$ANS" =~ ^[Yy]$ ]] || exit 0
 fi
@@ -80,7 +81,7 @@ else
     N_THREADS=$(nproc 2>/dev/null || echo 4)
     N_THREADS=$(( N_THREADS / 2 ))
     [ "$N_THREADS" -lt 2 ] && N_THREADS=2
-    [ "$N_THREADS" -gt 8 ] && N_THREADS=8
+    [ "$N_THREADS" -gt 8 ] && N_THREADS=8 # Max 8 threads for mobile stability
 
     info "Starting engine on port ${TINYLLAMA_LLAMA_PORT} with ${N_THREADS} threads..."
 
@@ -91,8 +92,7 @@ else
         -np 1 \
         -t  "$N_THREADS" \
         --port "$TINYLLAMA_LLAMA_PORT" \
-        --host 127.0.0.1 \
-        > "$HOME/tinyllama/logs/llama-server.log" 2>&1 &
+        --host 127.0.0.1 > "$HOME/tinyllama/logs/llama-server.log" 2>&1 &
 
     LLAMA_PID=$!
 
@@ -115,7 +115,7 @@ fi
 # Local IP for LAN access
 # ================================================================
 LOCAL_IP="127.0.0.1"
-if command -v ip &>/dev/null; then
+if command -v ip >/dev/null; then
     LOCAL_IP=$(ip route get 1 2>/dev/null \
         | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1);exit}}')
 fi
@@ -129,7 +129,7 @@ echo ""
 echo -e "  Chat UI (phone) : ${W}http://localhost:${TINYLLAMA_CHAT_PORT}${N}"
 echo -e "  Chat UI (LAN)   : ${W}http://${LOCAL_IP}:${TINYLLAMA_CHAT_PORT}${N}"
 echo -e "  Raw API         : ${W}http://localhost:${TINYLLAMA_LLAMA_PORT}${N}"
-echo ""
+echo "" # Added missing newline for better readability
 echo -e "  Open which UI?"
 echo -e "  ${Y}[1]${N} FastChat  — dark mode, saves history   ${D}← recommended${N}"
 echo -e "  ${Y}[2]${N} Llama.cpp — raw developer interface"
@@ -145,7 +145,7 @@ esac
 
 if [ -n "$URL" ]; then
     am start -a android.intent.action.VIEW -d "$URL" 2>/dev/null \
-    || termux-open-url "$URL" 2>/dev/null \
+        || termux-open-url "$URL" 2>/dev/null \
     || info "Could not auto-open browser. Go to: $URL"
 fi
 
@@ -160,9 +160,9 @@ echo ""
 # Patch chat_server.py to look for FastChatUI.html next to itself
 export FASTCHAT_HTML="$TINYLLAMA_UI"
 
-if command -v python3 &>/dev/null; then
+if command -v python3 >/dev/null; then
     python3 "$TINYLLAMA_SERVER" --no-browser --llama-cpp
-elif command -v python &>/dev/null; then
+elif command -v python >/dev/null; then
     python  "$TINYLLAMA_SERVER" --no-browser --llama-cpp
 else
     fail "Python not found. Run: pkg install python"
