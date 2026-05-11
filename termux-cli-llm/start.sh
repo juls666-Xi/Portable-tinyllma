@@ -22,7 +22,7 @@ fail() { echo -e "${R}  ✗ $1${N}"; exit 1; }
 
 echo ""
 echo -e "${C}================================================${N}"
-echo -e "${C}  TinyLlama 1.1B — Termux Launcher            ${N}"
+echo -e "${C}      TinyLlama 1.1B — Termux Launcher          ${N}"
 echo -e "${C}================================================${N}"
 echo ""
 

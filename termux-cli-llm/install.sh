@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ================================================================
-#  TinyLlama 1.1B — Termux Native Installer
+#  TinyLlama 1.1B — Termux Native Installer (Q2_K Edition)
 #  Run this once. Everything installs to ~/tinyllama/
 # ================================================================
 
@@ -28,13 +28,13 @@ W='\033[1;37m' N='\033[0m'
 banner() {
     echo ""
     echo -e "${C}================================================${N}"
-    echo -e "${C}  TinyLlama 1.1B — Termux Installer            ${N}"
+    echo -e "${C}  TinyLlama 1.1B Q2_K — Termux Installer       ${N}"
     echo -e "${C}================================================${N}"
     echo ""
 }
 
 step() { echo -e "\n${Y}[$1/$TOTAL] $2${N}"; }
-ok()   { echo -e "${G}  ✓ $1${N}"; }
+ok() { echo -e "${G}  ✓ $1${N}"; }
 info() { echo -e "${D}    $1${N}"; }
 warn() { echo -e "${Y}  ! $1${N}"; }
 fail() { echo -e "${R}  ✗ $1${N}"; exit 1; }
@@ -110,15 +110,15 @@ ok "Engine binary ready: $BIN_DIR/llama-server"
 # ================================================================
 # 3. Download model
 # ================================================================
-step 3 "Downloading TinyLlama-1.1B-Chat-v1.0.Q8_0 (~1.1 GB)..."
+step 3 "Downloading TinyLlama-1.1B-Chat-v1.0.Q2_K (~400 MB)..."
 
-MODEL_FILE="tinyllama-1.1b-chat-v1.0.Q8_0.gguf"
+MODEL_FILE="tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
 MODEL_URL="https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/${MODEL_FILE}"
 MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
 
 if [ -f "$MODEL_PATH" ]; then
     SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
-    if [ "$SIZE" -gt 1000000000 ]; then
+    if [ "$SIZE" -gt 300000000 ]; then
         ok "Model already downloaded."
     else
         warn "Incomplete file found. Re-downloading..."
@@ -134,7 +134,7 @@ if [ ! -f "$MODEL_PATH" ]; then
     termux-wake-unlock 2>/dev/null || true
 
     SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
-    [ "$SIZE" -gt 1000000000 ] || fail "Download incomplete. Re-run install.sh to resume."
+    [ "$SIZE" -gt 300000000 ] || fail "Download incomplete. Re-run install.sh to resume."
     ok "Model downloaded."
 fi
 
@@ -165,6 +165,7 @@ echo -e "${G}  INSTALL COMPLETE!${N}"
 echo -e "${C}================================================${N}"
 echo ""
 echo -e "  Model  : ${W}$MODEL_FILE${N}"
+echo -e "  Size   : ${W}~400 MB (Q2_K ultra-lightweight)${N}"
 echo -e "  Engine : ${W}$BIN_DIR/llama-server${N}"
 echo -e "  Config : ${W}$BASE_DIR/config.sh${N}"
 echo ""
