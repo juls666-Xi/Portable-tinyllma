@@ -1,4 +1,4 @@
-# TinyLlama 1.1B — Termux AI
+# TinyLlama 1.1B
 
 Run **TinyLlama-1.1B-Chat-v1.0 (Q8_0)** 100% offline on Android using Termux.  
 No root. No cloud. No USB drive needed. Runs straight from your phone's storage.
