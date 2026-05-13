@@ -1,0 +1,165 @@
+cat > install_linux.sh << 'EOF'
+#!/usr/bin/env bash
+# ================================================================
+# TinyLlama 1.1B — Linux Native Installer (Q2_K Edition)
+# Run this once. Everything installs to ~/.local/share/tinyllama/
+# ================================================================
+
+set -e
+
+BASE_DIR="$HOME/.local/share/tinyllama"
+BIN_DIR="$BASE_DIR/bin"
+MODEL_DIR="$BASE_DIR/models"
+LOG_DIR="$BASE_DIR/logs"
+CHAT_DIR="$BASE_DIR/chat_data"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+mkdir -p "$BIN_DIR" "$MODEL_DIR" "$LOG_DIR" "$CHAT_DIR"
+
+R='\033[0;31m' Y='\033[1;33m' G='\033[0;32m'
+C='\033[0;36m' M='\033[0;35m' D='\033[1;30m'
+W='\033[1;37m' N='\033[0m'
+
+banner() {
+    echo ""
+    echo -e "${C}================================================${N}"
+    echo -e "${C} TinyLlama 1.1B Q2_K — Linux Installer ${N}"
+    echo -e "${C}================================================${N}"
+    echo ""
+}
+
+step() { echo -e "\n${Y}[$1/$TOTAL] $2${N}"; }
+ok() { echo -e "${G} ✓ $1${N}"; }
+info() { echo -e "${D} $1${N}"; }
+warn() { echo -e "${Y} ! $1${N}"; }
+fail() { echo -e "${R} ✗ $1${N}"; exit 1; }
+
+TOTAL=4
+banner
+
+# ================================================================
+# 1. Detect distro and install packages
+# ================================================================
+step 1 "Installing packages..."
+
+if command -v apt &>/dev/null; then
+    PKG_MGR="apt"
+    sudo apt update -y
+    sudo apt install -y build-essential cmake ninja-build git wget python3 python3-pip
+elif command -v pacman &>/dev/null; then
+    PKG_MGR="pacman"
+    sudo pacman -Sy --noconfirm base-devel cmake ninja git wget python python-pip
+elif command -v dnf &>/dev/null; then
+    PKG_MGR="dnf"
+    sudo dnf install -y gcc gcc-c++ cmake ninja-build git wget python3 python3-pip
+elif command -v zypper &>/dev/null; then
+    PKG_MGR="zypper"
+    sudo zypper install -y gcc gcc-c++ cmake ninja git wget python3 python3-pip
+else
+    warn "Unknown package manager. Please install manually: build-essential cmake ninja-build git wget python3"
+    read -r -p " Continue anyway? (y/N): " ANS
+    [[ "$ANS" =~ ^[Yy]$ ]] || exit 0
+fi
+
+ok "Packages ready (using $PKG_MGR)"
+
+RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+RAM_GB=$(awk "BEGIN{printf \"%.1f\", $RAM_KB/1048576}")
+info "Device RAM: ${RAM_GB} GB"
+
+AVAIL_KB=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
+AVAIL_INT=$(awk "BEGIN{printf \"%d\", $AVAIL_KB/1048576}")
+if [ "$AVAIL_INT" -lt 1 ]; then
+    warn "Low available RAM. Close other apps before running start.sh."
+fi
+
+# ================================================================
+# 2. Build llama.cpp
+# ================================================================
+step 2 "Building llama.cpp engine..."
+
+cd "$BIN_DIR"
+
+if [ ! -d "llama.cpp" ]; then
+    info "Cloning llama.cpp..."
+    git clone --depth=1 https://github.com/ggerganov/llama.cpp.git
+fi
+
+cd llama.cpp
+
+if [ -f "build/bin/llama-server" ]; then
+    ok "Engine already compiled, skipping build."
+else
+    warn "Compiling natively..."
+    rm -rf build
+    cmake -B build -GNinja \
+        -DLLAMA_BUILD_SERVER=ON \
+        -DLLAMA_BUILD_TESTS=OFF \
+        -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --config Release --target llama-server -j$(nproc)
+    ok "Compilation done."
+fi
+
+cp build/bin/llama-server "$BIN_DIR/llama-server"
+[ -f "$BIN_DIR/llama-server" ] || fail "Build failed — check output above."
+ok "Engine binary ready: $BIN_DIR/llama-server"
+
+# ================================================================
+# 3. Download model (Q2_K — ultra-lightweight)
+# ================================================================
+step 3 "Downloading TinyLlama-1.1B-Chat-v1.0.Q2_K (~400 MB)..."
+
+MODEL_FILE="tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
+MODEL_URL="https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/${MODEL_FILE}"
+MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
+
+if [ -f "$MODEL_PATH" ]; then
+    SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
+    if [ "$SIZE" -gt 300000000 ]; then
+        ok "Model already downloaded."
+    else
+        warn "Incomplete file found. Re-downloading..."
+        rm -f "$MODEL_PATH"
+    fi
+fi
+
+if [ ! -f "$MODEL_PATH" ]; then
+    info "Saving to: $MODEL_PATH"
+    info "If interrupted, re-run install.sh — download resumes."
+    wget -c "$MODEL_URL" -O "$MODEL_PATH" --show-progress
+    SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
+    [ "$SIZE" -gt 300000000 ] || fail "Download incomplete. Re-run install.sh to resume."
+    ok "Model downloaded."
+fi
+
+# ================================================================
+# 4. Write config
+# ================================================================
+step 4 "Writing config..."
+
+cat > "$BASE_DIR/config.sh" << CONF
+TINYLLAMA_BASE="$BASE_DIR"
+TINYLLAMA_BIN="$BIN_DIR/llama-server"
+TINYLLAMA_MODEL="$MODEL_PATH"
+TINYLLAMA_UI="$SCRIPT_DIR/FastChatUI.html"
+TINYLLAMA_SERVER="$SCRIPT_DIR/chat_server.py"
+TINYLLAMA_LLAMA_PORT=8080
+TINYLLAMA_CHAT_PORT=3333
+CONF
+
+ok "Config saved to $BASE_DIR/config.sh"
+
+echo ""
+echo -e "${C}================================================${N}"
+echo -e "${G} INSTALL COMPLETE!${N}"
+echo -e "${C}================================================${N}"
+echo ""
+echo -e " Model  : ${W}$MODEL_FILE${N}"
+echo -e " Size   : ${W}~400 MB (Q2_K ultra-lightweight)${N}"
+echo -e " Engine : ${W}$BIN_DIR/llama-server${N}"
+echo -e " Config : ${W}$BASE_DIR/config.sh${N}"
+echo ""
+echo -e " Start the AI:"
+echo -e " ${W}bash start.sh${N}"
+echo ""
+EOF
