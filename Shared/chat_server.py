@@ -435,6 +435,7 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
 
             # Stream the response in chunks
+            buffer = ""
             while True:
                 chunk = response.read(4096)
                 if not chunk:
@@ -442,9 +443,10 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
                 
                 # If bridging llama.cpp SSE to Ollama JSONL
                 if LLAMA_CPP_MODE and is_stream:
-                    text = chunk.decode(errors="ignore")
-                    lines = text.split("\n")
-                    for line in lines:
+                    buffer += chunk.decode(errors="ignore")
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        line = line.strip()
                         if line.startswith("data: "):
                             data = line[6:].strip()
                             if data == "[DONE]":

@@ -145,6 +145,6 @@ else
     fail "Python not found. Install python3."
 fi
 
-[ -n "$LLAMA_PID" ] && kill -9 "$LLAMA_PID" 2>/dev/null
+[ -n "$LLAMA_PID" ] && kill "$LLAMA_PID" 2>/dev/null
 echo -e "${C} Goodbye.${N}"
 EOF

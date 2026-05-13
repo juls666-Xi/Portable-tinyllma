@@ -1,4 +1,3 @@
-cat > install_linux.sh << 'EOF'
 #!/usr/bin/env bash
 # ================================================================
 # TinyLlama 1.1B — Linux Native Installer (Q2_K Edition)
@@ -36,6 +35,76 @@ fail() { echo -e "${R} ✗ $1${N}"; exit 1; }
 
 TOTAL=4
 banner
+
+# ================================================================
+# 0. Check for existing GGUF file to import
+# ================================================================
+echo ""
+echo -e "${C}--- Model Setup ---${N}"
+echo ""
+echo -e " ${Y}[1]${N} Download Q2_K model from HuggingFace (~400 MB)"
+echo -e " ${Y}[2]${N} Import existing GGUF file from your system"
+echo ""
+read -r -p " Choice (1/2): " MODEL_CHOICE
+
+MODEL_FILE=""
+MODEL_PATH=""
+
+if [ "$MODEL_CHOICE" = "2" ]; then
+    echo ""
+    info "Looking for .gguf files in common locations..."
+
+    # Search common locations
+    FOUND_FILES=$(find "$HOME" -name "*.gguf" -type f 2>/dev/null | head -20)
+
+    if [ -n "$FOUND_FILES" ]; then
+        echo ""
+        echo -e "${G}Found these GGUF files:${N}"
+        echo "$FOUND_FILES" | nl -w2 -s') '
+        echo ""
+        echo -e " ${Y}[0]${N} None of these — I'll enter the path manually"
+        echo ""
+        read -r -p " Select file number (or 0 for manual): " FILE_NUM
+
+        if [ "$FILE_NUM" = "0" ]; then
+            echo ""
+            read -r -p " Enter full path to your .gguf file: " CUSTOM_PATH
+            if [ -f "$CUSTOM_PATH" ] && [[ "$CUSTOM_PATH" == *.gguf ]]; then
+                MODEL_FILE=$(basename "$CUSTOM_PATH")
+                info "Copying model to $MODEL_DIR/"
+                cp "$CUSTOM_PATH" "$MODEL_DIR/$MODEL_FILE"
+                ok "Model imported: $MODEL_FILE"
+            else
+                fail "Invalid file path or not a .gguf file."
+            fi
+        else
+            SELECTED=$(echo "$FOUND_FILES" | sed -n "${FILE_NUM}p")
+            if [ -n "$SELECTED" ] && [ -f "$SELECTED" ]; then
+                MODEL_FILE=$(basename "$SELECTED")
+                info "Copying model to $MODEL_DIR/"
+                cp "$SELECTED" "$MODEL_DIR/$MODEL_FILE"
+                ok "Model imported: $MODEL_FILE"
+            else
+                fail "Invalid selection."
+            fi
+        fi
+    else
+        echo ""
+        warn "No .gguf files found in $HOME"
+        echo ""
+        read -r -p " Enter full path to your .gguf file: " CUSTOM_PATH
+        if [ -f "$CUSTOM_PATH" ] && [[ "$CUSTOM_PATH" == *.gguf ]]; then
+            MODEL_FILE=$(basename "$CUSTOM_PATH")
+            info "Copying model to $MODEL_DIR/"
+            cp "$CUSTOM_PATH" "$MODEL_DIR/$MODEL_FILE"
+            ok "Model imported: $MODEL_FILE"
+        else
+            fail "Invalid file path or not a .gguf file."
+        fi
+    fi
+
+    MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
+fi
 
 # ================================================================
 # 1. Detect distro and install packages
@@ -105,31 +174,38 @@ cp build/bin/llama-server "$BIN_DIR/llama-server"
 ok "Engine binary ready: $BIN_DIR/llama-server"
 
 # ================================================================
-# 3. Download model (Q2_K — ultra-lightweight)
+# 3. Download or verify model
 # ================================================================
-step 3 "Downloading TinyLlama-1.1B-Chat-v1.0.Q2_K (~400 MB)..."
+step 3 "Setting up model..."
 
-MODEL_FILE="tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
-MODEL_URL="https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/${MODEL_FILE}"
-MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
+# If user chose to import, model is already in place
+if [ -n "$MODEL_PATH" ] && [ -f "$MODEL_PATH" ]; then
+    ok "Using imported model: $(basename "$MODEL_PATH")"
+else
+    # Download default Q2_K model
+    MODEL_FILE="tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
+    MODEL_URL="https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/${MODEL_FILE}"
+    MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
 
-if [ -f "$MODEL_PATH" ]; then
-    SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
-    if [ "$SIZE" -gt 300000000 ]; then
-        ok "Model already downloaded."
-    else
-        warn "Incomplete file found. Re-downloading..."
-        rm -f "$MODEL_PATH"
+    if [ -f "$MODEL_PATH" ]; then
+        SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
+        if [ "$SIZE" -gt 300000000 ]; then
+            ok "Model already downloaded."
+        else
+            warn "Incomplete file found. Re-downloading..."
+            rm -f "$MODEL_PATH"
+        fi
     fi
-fi
 
-if [ ! -f "$MODEL_PATH" ]; then
-    info "Saving to: $MODEL_PATH"
-    info "If interrupted, re-run install.sh — download resumes."
-    wget -c "$MODEL_URL" -O "$MODEL_PATH" --show-progress
-    SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
-    [ "$SIZE" -gt 300000000 ] || fail "Download incomplete. Re-run install.sh to resume."
-    ok "Model downloaded."
+    if [ ! -f "$MODEL_PATH" ]; then
+        info "Downloading from HuggingFace..."
+        info "Saving to: $MODEL_PATH"
+        info "If interrupted, re-run install.sh — download resumes."
+        wget -c "$MODEL_URL" -O "$MODEL_PATH" --show-progress
+        SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
+        [ "$SIZE" -gt 300000000 ] || fail "Download incomplete. Re-run install.sh to resume."
+        ok "Model downloaded."
+    fi
 fi
 
 # ================================================================
@@ -138,6 +214,7 @@ fi
 step 4 "Writing config..."
 
 cat > "$BASE_DIR/config.sh" << CONF
+# TinyLlama Linux config — auto-generated by install.sh
 TINYLLAMA_BASE="$BASE_DIR"
 TINYLLAMA_BIN="$BIN_DIR/llama-server"
 TINYLLAMA_MODEL="$MODEL_PATH"
@@ -149,17 +226,19 @@ CONF
 
 ok "Config saved to $BASE_DIR/config.sh"
 
+# ================================================================
+# Done
+# ================================================================
 echo ""
 echo -e "${C}================================================${N}"
 echo -e "${G} INSTALL COMPLETE!${N}"
 echo -e "${C}================================================${N}"
 echo ""
-echo -e " Model  : ${W}$MODEL_FILE${N}"
-echo -e " Size   : ${W}~400 MB (Q2_K ultra-lightweight)${N}"
+echo -e " Model  : ${W}$(basename "$MODEL_PATH")${N}"
+echo -e " Size   : ${W}$(du -h "$MODEL_PATH" | cut -f1)${N}"
 echo -e " Engine : ${W}$BIN_DIR/llama-server${N}"
 echo -e " Config : ${W}$BASE_DIR/config.sh${N}"
 echo ""
 echo -e " Start the AI:"
 echo -e " ${W}bash start.sh${N}"
 echo ""
-EOF

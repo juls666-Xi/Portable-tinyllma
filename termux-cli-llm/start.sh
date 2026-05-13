@@ -169,6 +169,6 @@ else
 fi
 
 # ---- Cleanup ----
-[ -n "$LLAMA_PID" ] && kill -9 "$LLAMA_PID" 2>/dev/null
+[ -n "$LLAMA_PID" ] && kill "$LLAMA_PID" 2>/dev/null
 termux-wake-unlock 2>/dev/null || true
 echo -e "${C}  Goodbye.${N}"
