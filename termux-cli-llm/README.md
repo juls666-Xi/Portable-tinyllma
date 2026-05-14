@@ -1,6 +1,6 @@
 # TinyLlama 1.1B
 
-Run **TinyLlama-1.1B-Chat-v1.0 (Q8_0)** 100% offline on Android using Termux.  
+Run **TinyLlama-1.1B-Chat-v1.0 (Q2_K)** 100% offline on Android using Termux.  
 No root. No cloud. No USB drive needed. Runs straight from your phone's storage.
 
 ---
@@ -8,7 +8,7 @@ No root. No cloud. No USB drive needed. Runs straight from your phone's storage.
 ## What you get
 
 - **llama.cpp** compiled natively for your ARM64 CPU
-- **TinyLlama-1.1B-Chat-v1.0 Q8_0** — ~1.1 GB, fast on any modern phone
+- **TinyLlama-1.1B-Chat-v1.0 Q2_K** — ~400 MB, ultra-lightweight and fast on any modern phone
 - **Dark-mode chat UI** with persistent history at `localhost:3333`
 - **OpenAI-compatible API** at `localhost:8080` for developers
 - LAN access — other devices on your Wi-Fi can connect too
@@ -22,7 +22,7 @@ No root. No cloud. No USB drive needed. Runs straight from your phone's storage.
 | Android | 8.0+ |
 | CPU | ARM64 (all phones since ~2015) |
 | RAM | 2 GB · 3 GB+ recommended |
-| Storage | 3 GB free (build ~1.5 GB + model 1.1 GB) |
+| Storage | 2 GB free (build ~1.5 GB + model ~0.4 GB) |
 | App | **Termux from F-Droid** — see below |
 
 ---
@@ -88,7 +88,7 @@ This takes **10–30 minutes** depending on your device.
 
 **[3/4] Download model**
 Downloads `tinyllama-1.1b-chat-v1.0.Q8_0.gguf` (~1.1 GB) from HuggingFace.
-Uses `wget -c` — if your connection drops, re-run `bash install.sh` to resume.
+Uses `wget -c` — if your connection drops, re-run `bash install.sh` to resume. (Note: This script now downloads Q2_K, which is ~400 MB)
 
 **[4/4] Config**
 Writes `~/tinyllama/config.sh` with all paths. You never need to edit this manually.
