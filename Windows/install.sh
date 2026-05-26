@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # ================================================================
-# TinyLlama 1.1B — Linux Native Installer (Q2_K Edition)
-# With GGUF import support + error handling
-# Run this once. Everything installs to ~/.local/share/tinyllama/
+# TinyLlama 1.1B — Windows Installer (Q2_K Edition)
+# Run this in Git Bash, MSYS2, or WSL
+# Everything installs to %USERPROFILE%\.tinyllama\
 # ================================================================
 
-set -e
+# Don't use set -e for interactive scripts
+# set -e
 
-BASE_DIR="$HOME/.local/share/tinyllama"
+BASE_DIR="$HOME/.tinyllama"
 BIN_DIR="$BASE_DIR/bin"
 MODEL_DIR="$BASE_DIR/models"
 LOG_DIR="$BASE_DIR/logs"
@@ -23,7 +24,7 @@ W='\033[1;37m' N='\033[0m'
 banner() {
     echo ""
     echo -e "${C}================================================${N}"
-    echo -e "${C} TinyLlama 1.1B Q2_K — Linux Installer ${N}"
+    echo -e "${C} TinyLlama 1.1B Q2_K — Windows Installer ${N}"
     echo -e "${C}================================================${N}"
     echo ""
 }
@@ -53,15 +54,22 @@ MODEL_PATH=""
 
 if [ "$MODEL_CHOICE" = "2" ]; then
     echo ""
-    info "Looking for .gguf files in common locations..."
+    info "Looking for .gguf files..."
 
-    # Search common locations (exclude the target model dir to avoid duplicates)
     FOUND_FILES=$(find "$HOME" -name "*.gguf" -type f 2>/dev/null | grep -v "$MODEL_DIR" | head -20)
+
+    WIN_DOWNLOADS="/c/Users/$(whoami)/Downloads"
+    if [ -d "$WIN_DOWNLOADS" ]; then
+        WIN_FILES=$(find "$WIN_DOWNLOADS" -name "*.gguf" -type f 2>/dev/null | head -20)
+        if [ -n "$WIN_FILES" ]; then
+            FOUND_FILES="$FOUND_FILES\n$WIN_FILES"
+        fi
+    fi
 
     if [ -n "$FOUND_FILES" ]; then
         echo ""
         echo -e "${G}Found these GGUF files:${N}"
-        echo "$FOUND_FILES" | nl -w2 -s') '
+        echo -e "$FOUND_FILES" | nl -w2 -s') '
         echo ""
         echo -e " ${Y}[0]${N} None of these — I'll enter the path manually"
         echo ""
@@ -72,7 +80,6 @@ if [ "$MODEL_CHOICE" = "2" ]; then
             read -r -p " Enter full path to your .gguf file: " CUSTOM_PATH || true
             if [ -f "$CUSTOM_PATH" ] && [[ "$CUSTOM_PATH" == *.gguf ]]; then
                 MODEL_FILE=$(basename "$CUSTOM_PATH")
-                # Check if file is already in the target directory
                 if [ "$CUSTOM_PATH" = "$MODEL_DIR/$MODEL_FILE" ]; then
                     info "File already in models directory."
                     MODEL_PATH="$CUSTOM_PATH"
@@ -86,10 +93,9 @@ if [ "$MODEL_CHOICE" = "2" ]; then
                 fail "Invalid file path or not a .gguf file."
             fi
         else
-            SELECTED=$(echo "$FOUND_FILES" | sed -n "${FILE_NUM}p")
+            SELECTED=$(echo -e "$FOUND_FILES" | sed -n "${FILE_NUM}p")
             if [ -n "$SELECTED" ] && [ -f "$SELECTED" ]; then
                 MODEL_FILE=$(basename "$SELECTED")
-                # Check if file is already in the target directory
                 if [ "$SELECTED" = "$MODEL_DIR/$MODEL_FILE" ]; then
                     info "File already in models directory."
                     MODEL_PATH="$SELECTED"
@@ -105,7 +111,7 @@ if [ "$MODEL_CHOICE" = "2" ]; then
         fi
     else
         echo ""
-        warn "No .gguf files found in $HOME (outside of $MODEL_DIR)"
+        warn "No .gguf files found"
         echo ""
         read -r -p " Enter full path to your .gguf file: " CUSTOM_PATH || true
         if [ -f "$CUSTOM_PATH" ] && [[ "$CUSTOM_PATH" == *.gguf ]]; then
@@ -126,115 +132,71 @@ if [ "$MODEL_CHOICE" = "2" ]; then
 fi
 
 # ================================================================
-# 1. Detect distro and install packages
+# 1. Check for llama.cpp server binary
 # ================================================================
-step 1 "Installing packages..."
+step 1 "Setting up llama.cpp engine..."
 
-# Check if required tools already exist
-HAVE_ALL=true
-for tool in gcc cmake ninja git wget python3; do
-    if ! command -v $tool &>/dev/null; then
-        HAVE_ALL=false
-        break
-    fi
-done
-
-if [ "$HAVE_ALL" = true ]; then
-    ok "All required packages already installed."
+if [ -f "$BIN_DIR/llama-server.exe" ]; then
+    ok "Engine already present."
+elif [ -f "$BIN_DIR/llama-server" ]; then
+    ok "Engine already present."
 else
-    info "Some packages missing. Attempting to install..."
+    info "Downloading pre-built llama-server for Windows..."
 
-    if command -v apt &>/dev/null; then
-        PKG_MGR="apt"
-        sudo apt update -y || warn "apt update failed — continuing anyway"
-        sudo apt install -y build-essential cmake ninja-build git wget python3 python3-pip || warn "Some packages failed to install"
-    elif command -v pacman &>/dev/null; then
-        PKG_MGR="pacman"
-        sudo pacman -Sy --noconfirm base-devel cmake ninja git wget python python-pip || warn "Some packages failed to install"
-    elif command -v dnf &>/dev/null; then
-        PKG_MGR="dnf"
-        sudo dnf install -y gcc gcc-c++ cmake ninja-build git wget python3 python3-pip || warn "Some packages failed to install"
-    elif command -v zypper &>/dev/null; then
-        PKG_MGR="zypper"
-        sudo zypper install -y gcc gcc-c++ cmake ninja git wget python3 python3-pip || warn "Some packages failed to install"
+    LLAMA_RELEASE="https://github.com/ggerganov/llama.cpp/releases/download/b3492/llama-b3492-bin-win-avx2-x64.zip"
+    TEMP_ZIP="$BIN_DIR/llama.zip"
+
+    wget -q "$LLAMA_RELEASE" -O "$TEMP_ZIP" || {
+        warn "Failed to download pre-built binary."
+        warn "Please download manually from: https://github.com/ggerganov/llama.cpp/releases"
+        warn "Extract llama-server.exe to: $BIN_DIR/"
+        fail "Cannot continue without llama-server.exe"
+    }
+
+    info "Extracting..."
+    unzip -q "$TEMP_ZIP" -d "$BIN_DIR/"
+    rm "$TEMP_ZIP"
+
+    if [ -f "$BIN_DIR/llama-server.exe" ]; then
+        ok "Engine ready: $BIN_DIR/llama-server.exe"
+    elif [ -f "$BIN_DIR/build/bin/llama-server.exe" ]; then
+        cp "$BIN_DIR/build/bin/llama-server.exe" "$BIN_DIR/"
+        ok "Engine ready: $BIN_DIR/llama-server.exe"
     else
-        warn "Unknown package manager. Please install manually: build-essential cmake ninja-build git wget python3"
-    fi
-
-    # Re-check
-    HAVE_ALL=true
-    for tool in gcc cmake ninja git wget python3; do
-        if ! command -v $tool &>/dev/null; then
-            HAVE_ALL=false
-            break
-        fi
-    done
-
-    if [ "$HAVE_ALL" = false ]; then
-        echo ""
-        warn "Some required tools are still missing after install attempt."
-        warn "Please install manually and re-run this script."
-        echo ""
-        echo "Required: gcc, cmake, ninja, git, wget, python3"
-        echo ""
-        read -r -p " Continue anyway? (y/N): " ANS || true
-        [[ "$ANS" =~ ^[Yy]$ ]] || exit 0
+        fail "Could not find llama-server.exe after extraction."
     fi
 fi
 
-ok "Packages ready"
-
-RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
-RAM_GB=$(awk "BEGIN{printf \"%.1f\", $RAM_KB/1048576}")
-info "Device RAM: ${RAM_GB} GB"
-
-AVAIL_KB=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
-AVAIL_INT=$(awk "BEGIN{printf \"%d\", $AVAIL_KB/1048576}")
-if [ "$AVAIL_INT" -lt 1 ]; then
-    warn "Low available RAM. Close other apps before running start.sh."
-fi
-
-# ================================================================
-# 2. Build llama.cpp
-# ================================================================
-step 2 "Building llama.cpp engine..."
-
-cd "$BIN_DIR"
-
-if [ ! -d "llama.cpp" ]; then
-    info "Cloning llama.cpp..."
-    git clone --depth=1 https://github.com/ggerganov/llama.cpp.git || fail "Failed to clone llama.cpp. Check internet connection."
-fi
-
-cd llama.cpp
-
-if [ -f "build/bin/llama-server" ]; then
-    ok "Engine already compiled, skipping build."
+if [ -f "$BIN_DIR/llama-server.exe" ]; then
+    LLAMA_BIN="$BIN_DIR/llama-server.exe"
 else
-    warn "Compiling natively..."
-    rm -rf build
-    cmake -B build -GNinja \
-        -DLLAMA_BUILD_SERVER=ON \
-        -DLLAMA_BUILD_TESTS=OFF \
-        -DCMAKE_BUILD_TYPE=Release || fail "cmake configuration failed"
-    cmake --build build --config Release --target llama-server -j$(nproc) || fail "Build failed"
-    ok "Compilation done."
+    LLAMA_BIN="$BIN_DIR/llama-server"
 fi
 
-cp build/bin/llama-server "$BIN_DIR/llama-server"
-[ -f "$BIN_DIR/llama-server" ] || fail "Build failed — check output above."
-ok "Engine binary ready: $BIN_DIR/llama-server"
+# ================================================================
+# 2. Check Python
+# ================================================================
+step 2 "Checking Python..."
+
+if command -v python3 &>/dev/null; then
+    ok "Python3 found"
+    PYTHON_CMD="python3"
+elif command -v python &>/dev/null; then
+    ok "Python found"
+    PYTHON_CMD="python"
+else
+    warn "Python not found. Please install Python 3 from python.org"
+    fail "Python is required for the chat server."
+fi
 
 # ================================================================
 # 3. Download or verify model
 # ================================================================
 step 3 "Setting up model..."
 
-# If user chose to import, model is already in place
 if [ -n "$MODEL_PATH" ] && [ -f "$MODEL_PATH" ]; then
     ok "Using imported model: $(basename "$MODEL_PATH")"
 else
-    # Download default Q2_K model
     MODEL_FILE="tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
     MODEL_URL="https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/${MODEL_FILE}"
     MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
@@ -252,7 +214,6 @@ else
     if [ ! -f "$MODEL_PATH" ]; then
         info "Downloading from HuggingFace..."
         info "Saving to: $MODEL_PATH"
-        info "If interrupted, re-run install.sh — download resumes."
         wget -c "$MODEL_URL" -O "$MODEL_PATH" --show-progress || fail "Download failed. Check internet connection."
         SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
         [ "$SIZE" -gt 300000000 ] || fail "Download incomplete. Re-run install.sh to resume."
@@ -266,9 +227,9 @@ fi
 step 4 "Writing config..."
 
 cat > "$BASE_DIR/config.sh" << CONF
-# TinyLlama Linux config — auto-generated by install.sh
+# TinyLlama Windows config — auto-generated by install.sh
 TINYLLAMA_BASE="$BASE_DIR"
-TINYLLAMA_BIN="$BIN_DIR/llama-server"
+TINYLLAMA_BIN="$LLAMA_BIN"
 TINYLLAMA_MODEL="$MODEL_PATH"
 TINYLLAMA_UI="$SCRIPT_DIR/FastChatUI.html"
 TINYLLAMA_SERVER="$SCRIPT_DIR/chat_server.py"
@@ -287,8 +248,8 @@ echo -e "${G} INSTALL COMPLETE!${N}"
 echo -e "${C}================================================${N}"
 echo ""
 echo -e " Model  : ${W}$(basename "$MODEL_PATH")${N}"
-echo -e " Size   : ${W}$(du -h "$MODEL_PATH" | cut -f1)${N}"
-echo -e " Engine : ${W}$BIN_DIR/llama-server${N}"
+echo -e " Size   : ${W}$(du -h "$MODEL_PATH" 2>/dev/null || echo "~400 MB")${N}"
+echo -e " Engine : ${W}$LLAMA_BIN${N}"
 echo -e " Config : ${W}$BASE_DIR/config.sh${N}"
 echo ""
 echo -e " Start the AI:"

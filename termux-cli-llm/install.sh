@@ -1,10 +1,11 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ================================================================
-#  TinyLlama 1.1B — Termux Native Installer (Q2_K Edition)
-#  Run this once. Everything installs to ~/tinyllama/
+# TinyLlama 1.1B — Termux Native Installer (Q2_K Edition)
+# Run this once. Everything installs to ~/tinyllama/
 # ================================================================
 
-set -e
+# Don't use set -e for interactive scripts
+# set -e
 
 # ---- Must be in Termux ----
 if [ ! -d "/data/data/com.termux" ]; then
@@ -28,16 +29,16 @@ W='\033[1;37m' N='\033[0m'
 banner() {
     echo ""
     echo -e "${C}================================================${N}"
-    echo -e "${C}  TinyLlama 1.1B Q2_K — Termux Installer       ${N}"
+    echo -e "${C} TinyLlama 1.1B Q2_K — Termux Installer ${N}"
     echo -e "${C}================================================${N}"
     echo ""
 }
 
 step() { echo -e "\n${Y}[$1/$TOTAL] $2${N}"; }
-ok() { echo -e "${G}  ✓ $1${N}"; }
-info() { echo -e "${D}    $1${N}"; }
-warn() { echo -e "${Y}  ! $1${N}"; }
-fail() { echo -e "${R}  ✗ $1${N}"; exit 1; }
+ok() { echo -e "${G} ✓ $1${N}"; }
+info() { echo -e "${D} $1${N}"; }
+warn() { echo -e "${Y} ! $1${N}"; }
+fail() { echo -e "${R} ✗ $1${N}"; exit 1; }
 
 TOTAL=4
 banner
@@ -47,8 +48,8 @@ banner
 # ================================================================
 step 1 "Installing packages..."
 
-apt update -y   2>/dev/null | tail -1
-apt upgrade -y  2>/dev/null | tail -1
+apt update -y 2>/dev/null | tail -1
+apt upgrade -y 2>/dev/null | tail -1
 pkg install -y clang cmake ninja git wget python 2>/dev/null
 
 ok "Packages ready"
@@ -108,7 +109,7 @@ cp build/bin/llama-server "$BIN_DIR/llama-server"
 ok "Engine binary ready: $BIN_DIR/llama-server"
 
 # ================================================================
-# 3. Download model
+# 3. Download model (Q2_K — ultra-lightweight)
 # ================================================================
 step 3 "Downloading TinyLlama-1.1B-Chat-v1.0.Q2_K (~400 MB)..."
 
@@ -161,14 +162,14 @@ ok "Config saved to $BASE_DIR/config.sh"
 # ================================================================
 echo ""
 echo -e "${C}================================================${N}"
-echo -e "${G}  INSTALL COMPLETE!${N}"
+echo -e "${G} INSTALL COMPLETE!${N}"
 echo -e "${C}================================================${N}"
 echo ""
-echo -e "  Model  : ${W}$MODEL_FILE${N}"
-echo -e "  Size   : ${W}~400 MB (Q2_K ultra-lightweight)${N}"
-echo -e "  Engine : ${W}$BIN_DIR/llama-server${N}"
-echo -e "  Config : ${W}$BASE_DIR/config.sh${N}"
+echo -e " Model  : ${W}$MODEL_FILE${N}"
+echo -e " Size   : ${W}~400 MB (Q2_K ultra-lightweight)${N}"
+echo -e " Engine : ${W}$BIN_DIR/llama-server${N}"
+echo -e " Config : ${W}$BASE_DIR/config.sh${N}"
 echo ""
-echo -e "  Start the AI:"
-echo -e "  ${W}bash start.sh${N}"
+echo -e " Start the AI:"
+echo -e " ${W}bash start.sh${N}"
 echo ""
