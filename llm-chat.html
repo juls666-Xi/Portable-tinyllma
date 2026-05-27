@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>localLLM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0d0f11;
+    --surface:   #141719;
+    --border:    #222529;
+    --border2:   #2e3236;
+    --text:      #c9d1d9;
+    --muted:     #4a5568;
+    --accent:    #57c4a7;
+    --accent2:   #4a9eff;
+    --user-bg:   #1a2332;
+    --ai-bg:     #111416;
+    --danger:    #f87171;
+    --glow:      rgba(87,196,167,.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: .05em;
+    white-space: nowrap;
+  }
+  .logo span { color: var(--muted); font-weight: 300; }
+
+  .sep { width: 1px; height: 18px; background: var(--border2); }
+
+  .model-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  label.lbl {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    white-space: nowrap;
+  }
+
+  input[type="text"], select {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 5px 10px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type="text"]:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--glow);
+  }
+
+  #modelInput { width: 180px; }
+
+  select { cursor: pointer; }
+  select option { background: var(--surface); }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background .3s, box-shadow .3s;
+  }
+  .status-dot.on  { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-dot.err { background: var(--danger); }
+
+  #statusText {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); background: var(--glow); }
+  .btn.primary {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn.primary:hover { background: var(--accent); color: var(--bg); }
+  .btn.danger:hover { border-color: var(--danger); color: var(--danger); background: rgba(248,113,113,.08); }
+
+  /* ── CHAT AREA ── */
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 0;
+    scroll-behavior: smooth;
+  }
+  #chat::-webkit-scrollbar { width: 4px; }
+  #chat::-webkit-scrollbar-track { background: transparent; }
+  #chat::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  .msg-row {
+    display: flex;
+    gap: 14px;
+    padding: 10px 20px;
+    animation: fadeSlide .2s ease;
+    max-width: 860px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .avatar {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .avatar.user { background: var(--user-bg); color: var(--accent2); border: 1px solid #1e3a5f; }
+  .avatar.ai   { background: #1a2620; color: var(--accent); border: 1px solid #1e3d30; }
+
+  .bubble {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.7;
+  }
+
+  .bubble-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: .05em;
+  }
+
+  .bubble-text {
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .bubble-text.ai-text { color: #b8c9bc; }
+
+  /* code blocks */
+  .bubble-text code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    background: #0a0c0e;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: #79c0ff;
+  }
+  .bubble-text pre {
+    background: #0a0c0e;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 8px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #a5d6ff;
+  }
+  .bubble-text pre code { background: none; border: none; padding: 0; color: inherit; }
+
+  /* thinking/system */
+  .sys-row {
+    text-align: center;
+    padding: 6px 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: .08em;
+  }
+
+  /* typing indicator */
+  .typing {
+    display: flex; gap: 4px; align-items: center;
+    padding: 6px 0;
+  }
+  .typing span {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: blink 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: .2s; }
+  .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink {
+    0%,80%,100% { opacity: .2; transform: scale(.8); }
+    40%         { opacity: 1;  transform: scale(1); }
+  }
+
+  /* empty state */
+  #emptyState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 10px;
+    pointer-events: none;
+    user-select: none;
+    opacity: .5;
+  }
+  #emptyState .ascii {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    line-height: 1.3;
+    text-align: center;
+  }
+  #emptyState p {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .05em;
+  }
+
+  /* ── INPUT BAR ── */
+  footer {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    max-width: 860px;
+    margin: 0 auto;
+    align-items: flex-end;
+  }
+
+  .textarea-wrap {
+    flex: 1;
+    position: relative;
+  }
+
+  #userInput {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    padding: 10px 14px;
+    resize: none;
+    outline: none;
+    min-height: 44px;
+    max-height: 160px;
+    overflow-y: auto;
+    line-height: 1.5;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  #userInput:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--glow);
+  }
+  #userInput::placeholder { color: var(--muted); }
+  #userInput::-webkit-scrollbar { width: 3px; }
+  #userInput::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  #sendBtn {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s;
+    flex-shrink: 0;
+  }
+  #sendBtn:hover { background: var(--accent); color: var(--bg); }
+  #sendBtn:disabled { opacity: .35; cursor: not-allowed; }
+  #sendBtn svg { width: 18px; height: 18px; }
+
+  .footer-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 860px;
+    margin: 6px auto 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* ── SETTINGS PANEL ── */
+  #settingsPanel {
+    display: none;
+    position: fixed;
+    top: 0; right: 0;
+    width: 300px;
+    height: 100dvh;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 100;
+    flex-direction: column;
+    animation: slideIn .2s ease;
+  }
+  #settingsPanel.open { display: flex; }
+  @keyframes slideIn {
+    from { transform: translateX(300px); }
+    to   { transform: translateX(0); }
+  }
+  .panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: .08em;
+  }
+  .panel-body { padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+  .field input, .field select, .field textarea {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 7px 10px;
+    outline: none;
+    width: 100%;
+    transition: border-color .2s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--glow);
+  }
+  .field textarea { resize: vertical; min-height: 80px; font-size: 11px; line-height: 1.5; }
+  .range-row { display: flex; align-items: center; gap: 8px; }
+  input[type=range] {
+    flex: 1; accent-color: var(--accent);
+    background: transparent; border: none; padding: 0;
+    box-shadow: none;
+  }
+  .range-val { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); width: 32px; text-align: right; }
+
+  /* scrollbar for settings */
+  .panel-body::-webkit-scrollbar { width: 3px; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* toast */
+  #toast {
+    position: fixed;
+    bottom: 80px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 7px 16px;
+    border-radius: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transition: all .25s;
+    white-space: nowrap;
+    z-index: 200;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">local<span>/</span>llm</div>
+  <div class="sep"></div>
+  <div class="model-wrap">
+    <label class="lbl">model</label>
+    <input type="text" id="modelInput" placeholder="llama3.2" value="llama3.2">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">disconnected</span>
+  </div>
+  <button class="btn" id="pingBtn">ping</button>
+  <button class="btn" id="clearBtn" title="Clear chat">clear</button>
+  <button class="btn primary" id="settingsBtn">config</button>
+</header>
+
+<!-- ── CHAT ── -->
+<div id="chat">
+  <div id="emptyState">
+    <div class="ascii">
+ ___  ___  ___  ___<br>
+|_ _||   ||  _||  _|<br>
+ | | | - || |_ | |_<br>
+ |_| |___||___||___|
+    </div>
+    <p>running on localhost · type to begin</p>
+  </div>
+</div>
+
+<!-- ── INPUT ── -->
+<footer>
+  <div class="input-row">
+    <textarea id="userInput" placeholder="Send a message..." rows="1"></textarea>
+    <button id="sendBtn" title="Send (Enter)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  </div>
+  <div class="footer-meta">
+    <span id="footerModel">—</span>
+    <span id="tokenCount"></span>
+  </div>
+</footer>
+
+<!-- ── SETTINGS ── -->
+<div id="settingsPanel">
+  <div class="panel-header">
+    <span>// config</span>
+    <button class="btn" id="closeSettings" style="padding:3px 8px;font-size:11px">✕</button>
+  </div>
+  <div class="panel-body">
+    <div class="field">
+      <label>API Base URL</label>
+      <input type="text" id="cfgBaseUrl" value="http://localhost:11434">
+    </div>
+    <div class="field">
+      <label>Model</label>
+      <input type="text" id="cfgModel" placeholder="llama3.2">
+    </div>
+    <div class="field">
+      <label>System Prompt</label>
+      <textarea id="cfgSystem" placeholder="You are a helpful assistant.">You are a helpful assistant.</textarea>
+    </div>
+    <div class="field">
+      <label>Temperature</label>
+      <div class="range-row">
+        <input type="range" id="cfgTemp" min="0" max="2" step="0.05" value="0.7">
+        <span class="range-val" id="cfgTempVal">0.7</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Max Tokens</label>
+      <input type="text" id="cfgMaxTokens" value="2048">
+    </div>
+    <div class="field">
+      <label>Context (msg history)</label>
+      <div class="range-row">
+        <input type="range" id="cfgCtx" min="2" max="50" step="2" value="20">
+        <span class="range-val" id="cfgCtxVal">20</span>
+      </div>
+    </div>
+    <button class="btn primary" id="saveSettings" style="margin-top:4px">save settings</button>
+    <button class="btn danger" id="resetSettings">reset defaults</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── STATE ──
+let cfg = {
+  baseUrl:   'http://localhost:11434',
+  model:     'llama3.2',
+  system:    'You are a helpful assistant.',
+  temp:      0.7,
+  maxTokens: 2048,
+  ctx:       20,
+};
+
+let messages   = [];   // {role, content}
+let isLoading  = false;
+let abortCtrl  = null;
+
+// ── DOM ──
+const chatEl      = document.getElementById('chat');
+const emptyState  = document.getElementById('emptyState');
+const userInput   = document.getElementById('userInput');
+const sendBtn     = document.getElementById('sendBtn');
+const statusDot   = document.getElementById('statusDot');
+const statusText  = document.getElementById('statusText');
+const footerModel = document.getElementById('footerModel');
+const tokenCount  = document.getElementById('tokenCount');
+const modelInput  = document.getElementById('modelInput');
+const toast       = document.getElementById('toast');
+
+// ── UTILS ──
+function showToast(msg, ms = 2500) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), ms);
+}
+
+function setStatus(state) {
+  statusDot.className = 'status-dot' + (state === 'on' ? ' on' : state === 'err' ? ' err' : '');
+  statusText.textContent = state === 'on' ? 'connected' : state === 'err' ? 'error' : 'disconnected';
+}
+
+function formatTime() {
+  return new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderMarkdown(text) {
+  // fenced code blocks
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code>${escapeHtml(code.trim())}</code></pre>`
+  );
+  // inline code
+  text = text.replace(/`([^`]+)`/g, (_, c) => `<code>${escapeHtml(c)}</code>`);
+  // bold
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // italic
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  return text;
+}
+
+function autoResize() {
+  userInput.style.height = 'auto';
+  userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
+}
+
+function scrollBottom() {
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+// ── RENDER MESSAGE ──
+function appendMessage(role, content, streaming = false) {
+  if (emptyState.parentNode) emptyState.style.display = 'none';
+
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+
+  const initials = role === 'user' ? 'you' : 'ai';
+  const avatarCls = role === 'user' ? 'user' : 'ai';
+  const bubbleCls = role === 'user' ? '' : 'ai-text';
+
+  row.innerHTML = `
+    <div class="avatar ${avatarCls}">${initials}</div>
+    <div class="bubble">
+      <div class="bubble-meta">${role === 'user' ? 'you' : cfg.model} · ${formatTime()}</div>
+      <div class="bubble-text ${bubbleCls}" id="btext-${Date.now()}">${
+        streaming ? '<div class="typing"><span></span><span></span><span></span></div>'
+                  : renderMarkdown(content)
+      }</div>
+    </div>`;
+  chatEl.appendChild(row);
+  scrollBottom();
+
+  const textEl = row.querySelector('.bubble-text');
+  return textEl;
+}
+
+function appendSystem(text) {
+  const s = document.createElement('div');
+  s.className = 'sys-row';
+  s.textContent = text;
+  chatEl.appendChild(s);
+  scrollBottom();
+}
+
+// ── SEND ──
+async function sendMessage() {
+  const content = userInput.value.trim();
+  if (!content || isLoading) return;
+
+  userInput.value = '';
+  autoResize();
+  isLoading = true;
+  sendBtn.disabled = true;
+
+  messages.push({ role: 'user', content });
+  appendMessage('user', content);
+
+  // trim context
+  const ctxMsgs = messages.slice(-cfg.ctx);
+
+  const aiEl = appendMessage('assistant', '', true);
+
+  try {
+    abortCtrl = new AbortController();
+    const payload = {
+      model:    cfg.model,
+      messages: [
+        { role: 'system', content: cfg.system },
+        ...ctxMsgs,
+      ],
+      stream:   true,
+      options: {
+        temperature: cfg.temp,
+        num_predict: cfg.maxTokens,
+      }
+    };
+
+    const res = await fetch(`${cfg.baseUrl}/api/chat`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+      signal:  abortCtrl.signal,
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    setStatus('on');
+    let fullText = '';
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = dec.decode(value, { stream: true });
+      const lines = chunk.split('\n').filter(Boolean);
+
+      for (const line of lines) {
+        try {
+          const json = JSON.parse(line);
+          const token = json?.message?.content ?? '';
+          fullText += token;
+          aiEl.innerHTML = renderMarkdown(fullText) + '<span style="opacity:.5">▌</span>';
+          scrollBottom();
+          if (json.done) {
+            const eval_count = json.eval_count ?? 0;
+            if (eval_count) tokenCount.textContent = `${eval_count} tok`;
+          }
+        } catch {}
+      }
+    }
+
+    aiEl.innerHTML = renderMarkdown(fullText);
+    messages.push({ role: 'assistant', content: fullText });
+
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      aiEl.innerHTML += '<br><span style="color:var(--muted);font-size:11px;font-family:\'IBM Plex Mono\',monospace">— stopped —</span>';
+    } else {
+      aiEl.innerHTML = `<span style="color:var(--danger);font-family:'IBM Plex Mono',monospace;font-size:12px">error: ${escapeHtml(err.message)}</span>`;
+      setStatus('err');
+    }
+  } finally {
+    isLoading = false;
+    sendBtn.disabled = false;
+    abortCtrl = null;
+    userInput.focus();
+  }
+}
+
+// ── PING ──
+async function ping() {
+  statusText.textContent = 'pinging…';
+  try {
+    const res = await fetch(`${cfg.baseUrl}/api/tags`, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const data = await res.json();
+      const models = data.models?.map(m => m.name) ?? [];
+      setStatus('on');
+      showToast(`✓ connected · ${models.length} model${models.length!==1?'s':''} found`);
+    } else throw new Error('bad status');
+  } catch {
+    setStatus('err');
+    showToast('✗ cannot reach ' + cfg.baseUrl);
+  }
+}
+
+// ── EVENTS ──
+sendBtn.addEventListener('click', sendMessage);
+
+userInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+userInput.addEventListener('input', autoResize);
+
+document.getElementById('pingBtn').addEventListener('click', ping);
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  messages = [];
+  chatEl.innerHTML = '';
+  chatEl.appendChild(emptyState);
+  emptyState.style.display = 'flex';
+  tokenCount.textContent = '';
+  showToast('chat cleared');
+});
+
+modelInput.addEventListener('change', () => {
+  cfg.model = modelInput.value.trim() || 'llama3.2';
+  footerModel.textContent = cfg.model;
+});
+
+// ── SETTINGS ──
+const settingsPanel = document.getElementById('settingsPanel');
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  document.getElementById('cfgBaseUrl').value   = cfg.baseUrl;
+  document.getElementById('cfgModel').value     = cfg.model;
+  document.getElementById('cfgSystem').value    = cfg.system;
+  document.getElementById('cfgTemp').value      = cfg.temp;
+  document.getElementById('cfgTempVal').textContent = cfg.temp;
+  document.getElementById('cfgMaxTokens').value = cfg.maxTokens;
+  document.getElementById('cfgCtx').value       = cfg.ctx;
+  document.getElementById('cfgCtxVal').textContent = cfg.ctx;
+  settingsPanel.classList.add('open');
+});
+document.getElementById('closeSettings').addEventListener('click', () => {
+  settingsPanel.classList.remove('open');
+});
+
+document.getElementById('cfgTemp').addEventListener('input', function() {
+  document.getElementById('cfgTempVal').textContent = this.value;
+});
+document.getElementById('cfgCtx').addEventListener('input', function() {
+  document.getElementById('cfgCtxVal').textContent = this.value;
+});
+
+document.getElementById('saveSettings').addEventListener('click', () => {
+  cfg.baseUrl   = document.getElementById('cfgBaseUrl').value.trim() || cfg.baseUrl;
+  cfg.model     = document.getElementById('cfgModel').value.trim()   || cfg.model;
+  cfg.system    = document.getElementById('cfgSystem').value;
+  cfg.temp      = parseFloat(document.getElementById('cfgTemp').value);
+  cfg.maxTokens = parseInt(document.getElementById('cfgMaxTokens').value) || 2048;
+  cfg.ctx       = parseInt(document.getElementById('cfgCtx').value) || 20;
+  modelInput.value = cfg.model;
+  footerModel.textContent = cfg.model;
+  settingsPanel.classList.remove('open');
+  showToast('settings saved');
+});
+
+document.getElementById('resetSettings').addEventListener('click', () => {
+  cfg = { baseUrl:'http://localhost:11434', model:'llama3.2', system:'You are a helpful assistant.', temp:0.7, maxTokens:2048, ctx:20 };
+  modelInput.value = cfg.model;
+  footerModel.textContent = cfg.model;
+  settingsPanel.classList.remove('open');
+  showToast('reset to defaults');
+});
+
+// ── STOP on double-click send while loading ──
+sendBtn.addEventListener('click', () => {
+  if (isLoading && abortCtrl) { abortCtrl.abort(); }
+});
+
+// ── INIT ──
+footerModel.textContent = cfg.model;
+userInput.focus();
+</script>
+</body>
+</html>
